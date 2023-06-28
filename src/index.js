@@ -154,12 +154,11 @@ async function uploadthisfile(filearr, workflowid) {
     )
   } else if (process.env.AWS_BUCKET_OUTPUT) {
     url = await uploadtos3(filearr, workflowid, process.env.AWS_BUCKET_OUTPUT)
-  } else if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
-    url = await uploadToAzureBlobStorage(
-      filearr,
-      workflowid,
-      process.env.STORAGE_COLLECTION
-    )
+  } else if (
+    process.env.AZURE_STORAGE_CONNECTION_STRING &&
+    process.env.STORAGE_COLLECTION
+  ) {
+    url = await uploadToAzureBlobStorage(filearr, workflowid)
   } else {
     console.error('No IPFS_OUTPUT and no AWS_BUCKET_OUTPUT. Upload failed')
     url = null
@@ -201,32 +200,13 @@ async function uploadtos3(filearr, workflowid, bucketName) {
   }
 }
 
-async function uploadToAzureBlobStorage(filearr, workflowid, containerName) {
-  // const blobService = new BlockBlobClient(
-  //   process.env.AZURE_STORAGE_CONNECTION_STRING,
-  //   containerName,
-  //   workflowid + filearr.path
-  // )
-  // const uploadParams = {
-  //   Bucket: containerName,
-  //   Key: '',
-  //   Body: ''
-  // }
+async function uploadToAzureBlobStorage(filearr, workflowid) {
   try {
     const blobService = new BlockBlobClient(
       process.env.AZURE_STORAGE_CONNECTION_STRING,
-      containerName,
+      process.env.STORAGE_COLLECTION,
       workflowid + filearr.path
     )
-    // const blobServiceClient = BlobServiceClient.fromConnectionString(
-    //   process.env.AZURE_STORAGE_CONNECTION_STRING
-    // )
-    // const containerClient = blobServiceClient.getContainerClient(containerName)
-    // console.log(
-    //   'uploadToAzureBlobStorage blobServiceClient containerName',
-    //   containerClient.containerName
-    // )
-    // containerClient.createIfNotExists()
     const fileStream = fs.createReadStream(filearr.path)
     const streamLength = fileStream.length
     await blobService.uploadStream(fileStream, streamLength)
