@@ -7,6 +7,7 @@ const fs = require('fs')
 const pg = require('pg')
 const myPath = require('path')
 const ipfsClient = require('ipfs-http-client')
+const { BlockBlobClient } = require('@azure/storage-blob')
 
 var pgpool = new pg.Pool({
   user: process.env.POSTGRES_USER,
@@ -27,7 +28,14 @@ program
   .option('-v, --verbose', 'Enables verbose mode')
   .action(() => {
     const { workflow, credentials, password, path, workflowid, verbose } = program
-    const config = { workflow, credentials, password, path, workflowid, verbose }
+    const config = {
+      workflow,
+      credentials,
+      password,
+      path,
+      workflowid,
+      verbose
+    }
 
     main(config)
       .then(() => {
@@ -146,6 +154,12 @@ async function uploadthisfile(filearr, workflowid) {
     )
   } else if (process.env.AWS_BUCKET_OUTPUT) {
     url = await uploadtos3(filearr, workflowid, process.env.AWS_BUCKET_OUTPUT)
+  } else if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
+    url = await uploadToAzureBlobStorage(
+      filearr,
+      workflowid,
+      process.env.STORAGE_COLLECTION
+    )
   } else {
     console.error('No IPFS_OUTPUT and no AWS_BUCKET_OUTPUT. Upload failed')
     url = null
@@ -183,6 +197,42 @@ async function uploadtos3(filearr, workflowid, bucketName) {
     const location = putObjectPromise.Location
     return location
   } catch (e) {
+    return null
+  }
+}
+
+async function uploadToAzureBlobStorage(filearr, workflowid, containerName) {
+  // const blobService = new BlockBlobClient(
+  //   process.env.AZURE_STORAGE_CONNECTION_STRING,
+  //   containerName,
+  //   workflowid + filearr.path
+  // )
+  // const uploadParams = {
+  //   Bucket: containerName,
+  //   Key: '',
+  //   Body: ''
+  // }
+  try {
+    const blobService = new BlockBlobClient(
+      process.env.AZURE_STORAGE_CONNECTION_STRING,
+      containerName,
+      workflowid + filearr.path
+    )
+    // const blobServiceClient = BlobServiceClient.fromConnectionString(
+    //   process.env.AZURE_STORAGE_CONNECTION_STRING
+    // )
+    // const containerClient = blobServiceClient.getContainerClient(containerName)
+    // console.log(
+    //   'uploadToAzureBlobStorage blobServiceClient containerName',
+    //   containerClient.containerName
+    // )
+    // containerClient.createIfNotExists()
+    const fileStream = fs.createReadStream(filearr.path)
+    const streamLength = fileStream.length
+    await blobService.uploadStream(fileStream, streamLength)
+    return blobService.url
+  } catch (e) {
+    console.log('uploadToAzureBlobStorage err:', e)
     return null
   }
 }
